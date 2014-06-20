@@ -8,6 +8,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -24,11 +26,9 @@ public class Statsd implements Closeable {
     private final String host;
     private final int port;
 
-    private boolean prependNewline = false;
-
     private ByteArrayOutputStream outputData;
     private DatagramSocket datagramSocket;
-    private Writer writer;
+    private DataCollector dataCollector;
 
     public Statsd(String host, int port) {
         this.host = host;
@@ -42,12 +42,37 @@ public class Statsd implements Closeable {
             throw new IllegalStateException("Already connected");
         }
 
-        prependNewline = false;
-
         datagramSocket = new DatagramSocket();
 
+        dataCollector = new DataCollector(datagramSocket.getReceiveBufferSize());
+
         outputData.reset();
-        this.writer = new BufferedWriter(new OutputStreamWriter(outputData));
+    }
+
+    private class DataCollector {
+        public List<List<String>> storage = new ArrayList<List<String>>();
+        private int currentSize = 0;
+        private int storageCapacity = 0;
+
+        public DataCollector(int capacity) {
+            storageCapacity = capacity > 0 ? capacity : 1024;
+            storage.add(new ArrayList<String>());
+        }
+
+        public void add(String newData) {
+            if (null == newData || newData.length() == 0) {
+                return;
+            }
+            newData = newData.concat("\n");
+            if (currentSize + newData.length() >= storageCapacity) {
+                storage.add(new ArrayList<String>());
+                currentSize = 0;
+            }
+            else {
+                currentSize = currentSize + newData.length();
+            }
+            storage.get(storage.size() - 1).add(newData);
+        }
     }
 
     public void send(String name, String value, StatType statType) throws IOException {
@@ -64,35 +89,30 @@ public class Statsd implements Closeable {
                 break;
         }
 
-        try {
-            if (prependNewline) {
-                writer.write("\n");
-            }
-            writer.write(sanitizeString(name));
-            writer.write(":");
-            writer.write(value);
-            writer.write("|");
-            writer.write(statTypeStr);
-            prependNewline = true;
-            writer.flush();
-        } catch (IOException e) {
-            logger.error("Error sending to Statsd:", e);
-        }
+        String data = sanitizeString(name).concat(":").concat(value).concat("|").concat(statTypeStr);
+        dataCollector.add(data);
     }
+
 
     @Override
     public void close() throws IOException {
-        DatagramPacket packet = newPacket(outputData);
-
-        packet.setData(outputData.toByteArray());
-        datagramSocket.send(packet);
+        for (List<String> list : dataCollector.storage) {
+            ByteArrayOutputStream outputDataBuffer = new ByteArrayOutputStream();
+            for (String line : list) {
+                outputDataBuffer.write(line.getBytes());
+            }
+            DatagramPacket packet = newPacket(outputDataBuffer);
+            packet.setData(outputDataBuffer.toByteArray());
+            datagramSocket.send(packet);
+        }
 
         if(datagramSocket != null) {
             datagramSocket.close();
         }
         this.datagramSocket = null;
-        this.writer = null;
+        dataCollector.storage.clear();
     }
+
 
     private String sanitizeString(String s) {
         return WHITESPACE.matcher(s).replaceAll("-");
