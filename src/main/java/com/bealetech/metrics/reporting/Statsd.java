@@ -50,7 +50,7 @@ public class Statsd implements Closeable {
     }
 
     private class DataCollector {
-        public List<List<String>> storage = new ArrayList<List<String>>();
+        private List<List<String>> storage = new ArrayList<List<String>>();
         private int currentSize = 0;
         private int storageCapacity = 0;
 
