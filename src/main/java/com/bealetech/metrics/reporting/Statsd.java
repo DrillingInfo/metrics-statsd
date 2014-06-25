@@ -49,6 +49,13 @@ public class Statsd implements Closeable {
         outputData.reset();
     }
 
+
+    /**
+     * A structure for storing data to send,
+     * it consists of lists of String.
+     * The size of each list is less than given _capacity_
+     * in order do not overflow transport buffer (DatagramSocket-> ReceiveBufferSize)
+     */
     private class DataCollector {
         private List<List<String>> storage = new ArrayList<List<String>>();
         private int currentSize = 0;
@@ -59,6 +66,10 @@ public class Statsd implements Closeable {
             storage.add(new ArrayList<String>());
         }
 
+
+        // Adds a new piece of data to the last sublist of storage.
+        // If the size of current sublist is going to be bigger than
+        // _storageCapacity_ then it starts a new sublist.
         public void add(String newData) {
             if (null == newData || newData.length() == 0) {
                 return;
