@@ -79,9 +79,7 @@ public class Statsd implements Closeable {
                 storage.add(new ArrayList<String>());
                 currentSize = 0;
             }
-            else {
-                currentSize = currentSize + newData.length();
-            }
+            currentSize = currentSize + newData.length();
             storage.get(storage.size() - 1).add(newData);
         }
     }
