@@ -20,6 +20,8 @@ public class Statsd implements Closeable {
     private static final Logger logger = LoggerFactory.getLogger(Statsd.class);
 
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]+");
+    private static final int MAX_CAPACITY = 1024 * 8;
+    private static final int MIN_CAPACITY = 1024;
 
     public static enum StatType { COUNTER, TIMER, GAUGE }
 
@@ -62,7 +64,9 @@ public class Statsd implements Closeable {
         private int storageCapacity = 0;
 
         public DataCollector(int capacity) {
-            storageCapacity = capacity > 0 ? capacity : 1024;
+            if (capacity <= 0 || capacity > MAX_CAPACITY) {
+                storageCapacity = MIN_CAPACITY;
+            }
             storage.add(new ArrayList<String>());
         }
 
@@ -134,7 +138,7 @@ public class Statsd implements Closeable {
             dataBuffer = out.toByteArray();
         }
         else {
-            dataBuffer = new byte[8192];
+            dataBuffer = new byte[MAX_CAPACITY];
         }
 
         try {
