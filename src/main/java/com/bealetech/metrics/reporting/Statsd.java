@@ -67,6 +67,9 @@ public class Statsd implements Closeable {
             if (capacity <= 0 || capacity > MAX_CAPACITY) {
                 storageCapacity = MIN_CAPACITY;
             }
+            else {
+                storageCapacity = capacity;
+            }
             storage.add(new ArrayList<String>());
         }
 
